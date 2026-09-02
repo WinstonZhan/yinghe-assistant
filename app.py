@@ -19,6 +19,12 @@ from PIL import Image, ImageEnhance, ImageFilter
 
 st.set_page_config(page_title="映禾小助手", page_icon="🎬", layout="wide")
 
+def config_value(name: str, default: str = ""):
+    try:
+        return str(st.secrets.get(name, os.getenv(name, default)))
+    except Exception:
+        return os.getenv(name, default)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap');
@@ -85,9 +91,9 @@ def demo_audio() -> bytes:
 def parse_bgm(url: str, platform: str):
     if not re.match(r"^https?://", url, re.I):
         raise ValueError("链接需要以 http:// 或 https:// 开头")
-    shazam_url, shazam_key = os.getenv("SHAZAM_API_URL"), os.getenv("SHAZAM_API_KEY")
-    ytdlp = os.getenv("YTDLP_PATH", "yt-dlp")
-    ffmpeg = os.getenv("FFMPEG_PATH", "ffmpeg")
+    shazam_url, shazam_key = config_value("SHAZAM_API_URL"), config_value("SHAZAM_API_KEY")
+    ytdlp = config_value("YTDLP_PATH", "yt-dlp")
+    ffmpeg = config_value("FFMPEG_PATH", "ffmpeg")
     if not shutil.which(ytdlp) or not shutil.which(ffmpeg):
         return demo_audio(), "稻香", "周杰伦", True
     with tempfile.TemporaryDirectory() as td:
@@ -102,7 +108,7 @@ def parse_bgm(url: str, platform: str):
         return data, "未知歌曲", "待配置识别 API", False
 
 def font_results(image: Image.Image):
-    api, key = os.getenv("FONT_API_URL"), os.getenv("FONT_API_KEY")
+    api, key = config_value("FONT_API_URL"), config_value("FONT_API_KEY")
     if api and key:
         try:
             b = io.BytesIO(); image.save(b, format="PNG")
