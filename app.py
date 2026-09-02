@@ -57,7 +57,17 @@ div.stButton > button{padding:.9rem 1.5rem!important;font-size:1.05rem!important
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="hero"><div class="eyebrow">YINGHE / CREATOR DESK</div><h1>映禾小助手 — 短视频编导 AI 工作台</h1><p>把繁琐留给工具，把灵感留给创作</p><div class="hint">BGM 识别  专业字体识别</div></div>', unsafe_allow_html=True)
+if "entered" not in st.session_state: st.session_state.entered = False
+if "active_tool" not in st.session_state: st.session_state.active_tool = None
+if st.session_state.entered and st.session_state.active_tool is None:
+    top_left, top_title = st.columns([0.08, 0.92])
+    with top_left:
+        if st.button("←", key="back-home-top", help="返回主页"):
+            st.session_state.entered = False; st.rerun()
+    with top_title:
+        st.markdown('<div class="hero"><div class="eyebrow">YINGHE / CREATOR DESK</div><h1>映禾小助手 — 短视频编导 AI 工作台</h1><p>把繁琐留给工具，把灵感留给创作</p><div class="hint">BGM 识别  专业字体识别</div></div>', unsafe_allow_html=True)
+else:
+    st.markdown('<div class="hero"><div class="eyebrow">YINGHE / CREATOR DESK</div><h1>映禾小助手 — 短视频编导 AI 工作台</h1><p>把繁琐留给工具，把灵感留给创作</p><div class="hint">BGM 识别  专业字体识别</div></div>', unsafe_allow_html=True)
 
 if "search_history" not in st.session_state:
     st.session_state.search_history = []
@@ -67,11 +77,6 @@ if "bgm_library" not in st.session_state:
     st.session_state.bgm_library = []
 if "font_library" not in st.session_state:
     st.session_state.font_library = []
-
-if "entered" not in st.session_state:
-    st.session_state.entered = False
-if "active_tool" not in st.session_state:
-    st.session_state.active_tool = None
 
 if not st.session_state.entered:
     st.markdown('''<section class="landing"><div><div class="eyebrow">映禾剪辑工作室 · CREATIVE TOOLKIT</div><h2>把繁琐留给工具，<br>把灵感留给创作</h2><p>映禾小助手为短视频编导与剪辑师提供 BGM 识别、音轨处理与专业字体识别，让每一次创作都更快找到节奏与表达。</p></div></section>''', unsafe_allow_html=True)
@@ -91,9 +96,7 @@ def copy_button(text: str, key: str, label: str):
         st.info("已准备复制内容：请点击代码框右上角复制。")
 
 if st.session_state.entered and st.session_state.active_tool is None:
-    st.markdown("<style>.stApp{background:linear-gradient(145deg,#c8c0da 0%,#e8cad7 42%,#fff 100%)}.stButton button{min-height:145px!important;border-radius:24px!important;box-shadow:0 14px 28px rgba(49,22,74,.2)!important}.stButton button p{font-size:25px!important;font-weight:700!important}.stButton button[kind='primary']{background:linear-gradient(135deg,#123b5a,#1d8a9b)!important}.stButton button:not([kind='primary']){background:linear-gradient(135deg,#47204f,#a05291)!important}.back-home button{min-height:42px!important;width:48px!important;border-radius:50%!important;padding:0!important;font-size:24px!important;background:rgba(255,255,255,.75)!important;color:#21152e!important;box-shadow:0 6px 14px rgba(49,22,74,.15)!important}</style>", unsafe_allow_html=True)
-    if st.button("←", key="back-home", help="返回主页"):
-        st.session_state.entered = False; st.session_state.active_tool = None; st.rerun()
+    st.markdown("<style>.stApp{background:linear-gradient(145deg,#c8c0da 0%,#e8cad7 42%,#fff 100%)}.stButton button{min-height:145px!important;border-radius:24px!important;box-shadow:0 14px 28px rgba(49,22,74,.2)!important}.stButton button p{font-size:25px!important;font-weight:700!important}.stButton button[kind='primary']{background:linear-gradient(135deg,#123b5a,#1d8a9b)!important}.stButton button:not([kind='primary']){background:linear-gradient(135deg,#47204f,#a05291)!important}div[data-testid='column']:first-child .stButton button{min-height:44px!important;width:48px!important;border-radius:50%!important;padding:0!important;font-size:24px!important;background:rgba(255,255,255,.75)!important;color:#21152e!important;box-shadow:0 6px 14px rgba(49,22,74,.15)!important}</style>", unsafe_allow_html=True)
     st.markdown("## 选择创作工具")
     st.caption("选择一个工作区，进入完整功能")
     nav1, nav2 = st.columns(2)
