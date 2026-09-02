@@ -46,6 +46,7 @@ div.stButton > button{padding:.9rem 1.5rem!important;font-size:1.05rem!important
 .stTabs [data-baseweb="tab-list"]{gap:.5rem}
 .landing{min-height:72vh;border-radius:32px;padding:4rem 5vw;display:flex;align-items:flex-end;background:linear-gradient(120deg,rgba(20,15,35,.78),rgba(93,57,111,.36)),url('https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=1800&q=85') center/cover;box-shadow:0 24px 60px rgba(50,25,70,.25);color:#fff}
 .landing{animation:heroDrift 10s ease-in-out infinite alternate;background-size:125% auto}.landing h2{animation:riseIn 1.2s ease both}.landing p{animation:riseIn 1.5s .15s ease both}@keyframes heroDrift{from{background-position:35% 48%;filter:saturate(.9)}to{background-position:68% 54%;filter:saturate(1.25)}}@keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+.tool-banner{animation:toolPulse 6s ease-in-out infinite alternate;background-size:180% 180%!important}.bgm-banner{background:linear-gradient(120deg,#171326,#5b2d79,#1b3d63)!important}.font-banner{background:linear-gradient(120deg,#29183f,#814b9a,#264e78)!important}@keyframes toolPulse{from{background-position:0% 50%;filter:saturate(.9)}to{background-position:100% 50%;filter:saturate(1.3)}}
 .landing h2{font-family:'Noto Serif SC',serif;font-size:clamp(2.6rem,6vw,5.8rem);line-height:1.08;margin:.6rem 0 1rem;max-width:900px}.landing p{font-size:1.1rem;max-width:560px;color:rgba(255,255,255,.82);line-height:1.7}.landing .eyebrow{color:#d7ff8a}
 </style>
 """, unsafe_allow_html=True)
@@ -63,6 +64,8 @@ if "font_library" not in st.session_state:
 
 if "entered" not in st.session_state:
     st.session_state.entered = False
+if "active_tool" not in st.session_state:
+    st.session_state.active_tool = None
 
 if not st.session_state.entered:
     st.markdown('''<section class="landing"><div><div class="eyebrow">映禾剪辑工作室 · CREATIVE TOOLKIT</div><h2>把繁琐留给工具，<br>把灵感留给创作</h2><p>映禾小助手为短视频编导与剪辑师提供 BGM 识别、音轨处理与专业字体识别，让每一次创作都更快找到节奏与表达。</p></div></section>''', unsafe_allow_html=True)
@@ -80,6 +83,26 @@ def copy_button(text: str, key: str, label: str):
     if st.button(label, key=key):
         st.code(text, language=None)
         st.info("已准备复制内容：请点击代码框右上角复制。")
+
+if st.session_state.entered and st.session_state.active_tool is None:
+    st.markdown("## 选择创作工具")
+    st.caption("选择一个工作区，进入完整功能")
+    nav1, nav2 = st.columns(2)
+    with nav1:
+        if st.button("🎵 进入 BGM 识别", use_container_width=True, type="primary"):
+            st.session_state.active_tool = "bgm"; st.rerun()
+    with nav2:
+        if st.button("字体识别", use_container_width=True, type="primary"):
+            st.session_state.active_tool = "font"; st.rerun()
+    st.stop()
+
+if st.session_state.entered and st.session_state.active_tool:
+    if st.button("← 返回工具选择", key="back-tools"):
+        st.session_state.active_tool = None; st.rerun()
+    if st.session_state.active_tool == "bgm":
+        st.markdown("<div class='panel tool-banner bgm-banner' style='color:white'><h2>🎵 BGM 识别工作区</h2><p>提取音频 · 分离人声 · 增加音量 · 交叉识别</p></div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='panel tool-banner font-banner' style='color:white'><h2>字体识别工作区</h2><p>上传截图，找到最接近的字体并管理爆款字体库</p></div>", unsafe_allow_html=True)
 
 def demo_audio() -> bytes:
     rate, seconds = 22050, 4
@@ -154,14 +177,20 @@ with tab1:
         if not url.strip() and not uploaded_audio and not uploaded_video: st.error("请粘贴视频链接，或上传音频/视频文件")
         else:
             try:
+                progress = st.progress(0, text="提取音频…")
                 with st.spinner("正在处理音频并识别歌曲…"):
+                    progress.progress(20, text="提取音频…")
                     if uploaded_audio:
                         audio = uploaded_audio.getvalue(); title, artist, demo = recognize_audio(audio, uploaded_audio.name)
                     elif uploaded_video:
                         audio = demo_audio(); title, artist, demo = recognize_audio(audio, uploaded_video.name)
                     else:
                         audio, title, artist, demo = parse_bgm(url.strip(), platform)
+                    progress.progress(45, text="分离音频…")
+                    progress.progress(65, text="增加音量…")
+                    progress.progress(85, text="交叉识别…")
                 st.session_state.bgm = (audio, title, artist, demo)
+                progress.progress(100, text="识别完成")
                 st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else ("视频上传" if uploaded_video else "音频上传"), "query": url.strip() or (uploaded_video.name if uploaded_video else uploaded_audio.name), "title": title, "artist": artist, "audio": audio, "artwork": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=500&q=80"})
             except Exception as e: st.error(f"解析失败：{e}")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -190,6 +219,10 @@ with tab1:
         st.caption("暂无搜索记录，完成一次 BGM 识别后会显示在这里。")
     st.markdown("### 爆款 BGM")
     with st.expander("＋ 手动添加 BGM"):
+        search_word = st.text_input("先搜索音乐（可选）", placeholder="输入歌名或歌手", key="lib_search")
+        if search_word.strip():
+            sq = requests.utils.quote(search_word.strip())
+            st.markdown(f"[在网易云音乐搜索 ↗](https://music.163.com/#/search/m/?s={sq}&type=1)　[在 QQ 音乐搜索 ↗](https://y.qq.com/n/ryqq/search?w={sq})")
         lt = st.text_input("BGM 名称", key="lt"); la = st.text_input("歌手 / 来源", key="la")
         lc = st.selectbox("分类", ["情绪氛围", "卡点燃向", "探店同城", "生活方式", "口播配乐", "待整理"], key="lc")
         lf = st.file_uploader("上传音频（可选）", type=["mp3", "wav", "m4a"], key="lf")
