@@ -112,6 +112,17 @@ def parse_bgm(url: str, platform: str):
             obj = r.json(); return data, obj.get("title", "未知歌曲"), obj.get("artist", "未知歌手"), False
         return data, "未知歌曲", "待配置识别 API", False
 
+def recognize_audio(data: bytes, filename: str):
+    api, key = config_value("SHAZAM_API_URL"), config_value("SHAZAM_API_KEY")
+    if not api or not key:
+        return "稻香", "周杰伦", True
+    if "audd.io" in api.lower():
+        r = requests.post(api, data={"api_token": key, "return": "apple_music,spotify"}, files={"file": (filename, data)}, timeout=45)
+        r.raise_for_status(); obj = r.json().get("result") or {}
+        return obj.get("title", "未知歌曲"), obj.get("artist", "未知歌手"), False
+    r = requests.post(api, headers={"X-API-Key": key}, files={"file": (filename, data)}, timeout=30)
+    r.raise_for_status(); obj = r.json(); return obj.get("title", "未知歌曲"), obj.get("artist", "未知歌手"), False
+
 def font_results(image: Image.Image):
     api, key = config_value("FONT_API_URL"), config_value("FONT_API_KEY")
     if api and key:
@@ -130,21 +141,27 @@ with tab1:
     st.markdown('<div class="panel"><div class="eyebrow">01 / AUDIO</div>', unsafe_allow_html=True)
     platform = st.selectbox("选择视频平台", ["抖音 Douyin", "TikTok", "YouTube / Shorts"])
     url = st.text_input("请粘贴视频分享链接", placeholder="https://v.douyin.com/...", key="video_url")
+    uploaded_audio = st.file_uploader("或直接上传待识别音频（推荐）", type=["mp3", "wav", "m4a"], key="bgm_audio")
     st.checkbox("自动人声分离，仅保留 BGM", value=True, disabled=True)
     st.checkbox("自动增益提升音量，提高识别准确率", value=True, disabled=True)
-    st.info("处理后将提交网易云音乐与 QQ 音乐进行交叉识别（配置 API 后启用）")
+    
     if st.button("🚀 开始 BGM 识别", type="primary"):
-        if not url.strip(): st.error("请先粘贴视频分享链接")
+        if not url.strip() and not uploaded_audio: st.error("请粘贴视频链接或上传音频文件")
         else:
             try:
-                with st.spinner("正在分离人声、增强音量并交叉识别…"): audio, title, artist, demo = parse_bgm(url.strip(), platform)
+                with st.spinner("正在处理音频并识别歌曲…"):
+                    if uploaded_audio:
+                        audio = uploaded_audio.getvalue(); title, artist, demo = recognize_audio(audio, uploaded_audio.name)
+                    else:
+                        audio, title, artist, demo = parse_bgm(url.strip(), platform)
                 st.session_state.bgm = (audio, title, artist, demo)
-                st.session_state.search_history.insert(0, {"platform": platform.split()[0], "query": url.strip(), "title": title, "artist": artist, "audio": audio})
+                st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else "音频上传", "query": url.strip() or uploaded_audio.name, "title": title, "artist": artist, "audio": audio})
             except Exception as e: st.error(f"解析失败：{e}")
     st.markdown('</div>', unsafe_allow_html=True)
     if "bgm" in st.session_state:
         audio, title, artist, demo = st.session_state.bgm
         st.audio(audio, format="audio/wav")
+        st.image("https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=500&q=80", caption="歌曲封面", width=180)
         if demo: st.info("当前为演示结果。配置 yt-dlp、ffmpeg 与 SHAZAM_API_* 后可连接真实识别服务。")
         st.markdown(f'<div class="result"><div class="meta">识别结果</div><h3>《{title}》</h3><div class="meta">歌手 / 艺术家：{artist}</div></div>', unsafe_allow_html=True)
         copy_button(f"{artist} - {title}", "copy-song", "📋 一键复制歌名")
