@@ -103,6 +103,11 @@ def parse_bgm(url: str, platform: str):
         subprocess.run([ffmpeg, "-y", "-i", str(source), "-vn", "-ac", "1", "-ar", "44100", str(audio)], check=True, capture_output=True, timeout=90)
         data = audio.read_bytes()
         if shazam_url and shazam_key:
+            if "audd.io" in shazam_url.lower():
+                r = requests.post(shazam_url, data={"api_token": shazam_key, "return": "apple_music,spotify"}, files={"file": ("bgm.wav", data)}, timeout=45)
+                r.raise_for_status(); obj = r.json().get("result") or {}
+                title = obj.get("title", "未知歌曲"); artist = obj.get("artist", "未知歌手")
+                return data, title, artist, False
             r = requests.post(shazam_url, headers={"X-API-Key": shazam_key}, files={"file": ("bgm.wav", data)}, timeout=30); r.raise_for_status()
             obj = r.json(); return data, obj.get("title", "未知歌曲"), obj.get("artist", "未知歌手"), False
         return data, "未知歌曲", "待配置识别 API", False
