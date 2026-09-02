@@ -91,7 +91,7 @@ def copy_button(text: str, key: str, label: str):
         st.info("已准备复制内容：请点击代码框右上角复制。")
 
 if st.session_state.entered and st.session_state.active_tool is None:
-    st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(24,16,42,.2),rgba(72,39,92,.18)),url('https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1800&q=80') center/cover fixed}.stButton button{min-height:145px!important;font-size:1.2rem!important;border-radius:24px!important;background:linear-gradient(135deg,#1a1230,#67318b)!important;box-shadow:0 14px 28px rgba(49,22,74,.25)!important}</style>", unsafe_allow_html=True)
+    st.markdown("<style>.stApp{background:linear-gradient(145deg,#c8c0da 0%,#e8cad7 42%,#fff 100%)}.stButton button{min-height:145px!important;font-size:1.2rem!important;border-radius:24px!important;box-shadow:0 14px 28px rgba(49,22,74,.2)!important}.stButton button[kind='primary']{background:linear-gradient(135deg,#123b5a,#1d8a9b)!important}.stButton button:not([kind='primary']){background:linear-gradient(135deg,#47204f,#a05291)!important}</style>", unsafe_allow_html=True)
     st.markdown("## 选择创作工具")
     st.caption("选择一个工作区，进入完整功能")
     nav1, nav2 = st.columns(2)
@@ -99,8 +99,12 @@ if st.session_state.entered and st.session_state.active_tool is None:
         if st.button("🎵 进入 BGM 识别", use_container_width=True, type="primary"):
             st.session_state.active_tool = "bgm"; st.rerun()
     with nav2:
-        if st.button("字体识别", use_container_width=True, type="primary"):
+        if st.button("字体识别", use_container_width=True, type="secondary"):
             st.session_state.active_tool = "font"; st.rerun()
+    if st.button("← 返回主页", key="back-home"):
+        st.session_state.entered = False
+        st.session_state.active_tool = None
+        st.rerun()
     st.stop()
 
 if st.session_state.entered and st.session_state.active_tool:
