@@ -91,7 +91,9 @@ def copy_button(text: str, key: str, label: str):
         st.info("已准备复制内容：请点击代码框右上角复制。")
 
 if st.session_state.entered and st.session_state.active_tool is None:
-    st.markdown("<style>.stApp{background:linear-gradient(145deg,#c8c0da 0%,#e8cad7 42%,#fff 100%)}.stButton button{min-height:145px!important;font-size:1.2rem!important;border-radius:24px!important;box-shadow:0 14px 28px rgba(49,22,74,.2)!important}.stButton button[kind='primary']{background:linear-gradient(135deg,#123b5a,#1d8a9b)!important}.stButton button:not([kind='primary']){background:linear-gradient(135deg,#47204f,#a05291)!important}</style>", unsafe_allow_html=True)
+    st.markdown("<style>.stApp{background:linear-gradient(145deg,#c8c0da 0%,#e8cad7 42%,#fff 100%)}.stButton button{min-height:145px!important;border-radius:24px!important;box-shadow:0 14px 28px rgba(49,22,74,.2)!important}.stButton button p{font-size:25px!important;font-weight:700!important}.stButton button[kind='primary']{background:linear-gradient(135deg,#123b5a,#1d8a9b)!important}.stButton button:not([kind='primary']){background:linear-gradient(135deg,#47204f,#a05291)!important}.back-home button{min-height:42px!important;width:48px!important;border-radius:50%!important;padding:0!important;font-size:24px!important;background:rgba(255,255,255,.75)!important;color:#21152e!important;box-shadow:0 6px 14px rgba(49,22,74,.15)!important}</style>", unsafe_allow_html=True)
+    if st.button("←", key="back-home", help="返回主页"):
+        st.session_state.entered = False; st.session_state.active_tool = None; st.rerun()
     st.markdown("## 选择创作工具")
     st.caption("选择一个工作区，进入完整功能")
     nav1, nav2 = st.columns(2)
@@ -101,10 +103,6 @@ if st.session_state.entered and st.session_state.active_tool is None:
     with nav2:
         if st.button("字体识别", use_container_width=True, type="secondary"):
             st.session_state.active_tool = "font"; st.rerun()
-    if st.button("← 返回主页", key="back-home"):
-        st.session_state.entered = False
-        st.session_state.active_tool = None
-        st.rerun()
     st.stop()
 
 if st.session_state.entered and st.session_state.active_tool:
