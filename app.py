@@ -51,6 +51,8 @@ div.stButton > button{padding:.9rem 1.5rem!important;font-size:1.05rem!important
 .landing{min-height:72vh;border-radius:32px;padding:4rem 5vw;display:flex;align-items:flex-end;background:linear-gradient(120deg,rgba(20,15,35,.78),rgba(93,57,111,.36)),url('https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=1800&q=85') center/cover;box-shadow:0 24px 60px rgba(50,25,70,.25);color:#fff}
 .landing{animation:heroDrift 10s ease-in-out infinite alternate;background-size:125% auto}.landing h2{animation:riseIn 1.2s ease both}.landing p{animation:riseIn 1.5s .15s ease both}@keyframes heroDrift{from{background-position:35% 48%;filter:saturate(.9)}to{background-position:68% 54%;filter:saturate(1.25)}}@keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
 .tool-banner{animation:toolPulse 8s ease-in-out infinite alternate;background-size:140% auto!important;background-position:center!important}.bgm-banner{background-image:linear-gradient(120deg,rgba(18,12,35,.82),rgba(76,37,105,.48)),url('https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1800&q=85')!important}.font-banner{background-image:linear-gradient(120deg,rgba(41,24,63,.86),rgba(125,77,145,.5)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=85')!important}@keyframes toolPulse{from{background-position:38% 48%;filter:saturate(.9)}to{background-position:62% 52%;filter:saturate(1.3)}}
+.music-page{background:linear-gradient(120deg,rgba(21,16,41,.32),rgba(60,27,75,.18)),url('https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?auto=format&fit=crop&w=1800&q=80') center/cover fixed!important}.type-page{background:linear-gradient(120deg,rgba(37,24,56,.28),rgba(82,50,99,.18)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=80') center/cover fixed!important}
+.tool-choice button{min-height:145px!important;font-size:1.25rem!important;border-radius:24px!important}
 .landing h2{font-family:'Noto Serif SC',serif;font-size:clamp(2.6rem,6vw,5.8rem);line-height:1.08;margin:.6rem 0 1rem;max-width:900px}.landing p{font-size:1.1rem;max-width:560px;color:rgba(255,255,255,.82);line-height:1.7}.landing .eyebrow{color:#d7ff8a}
 </style>
 """, unsafe_allow_html=True)
@@ -89,6 +91,7 @@ def copy_button(text: str, key: str, label: str):
         st.info("已准备复制内容：请点击代码框右上角复制。")
 
 if st.session_state.entered and st.session_state.active_tool is None:
+    st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(24,16,42,.2),rgba(72,39,92,.18)),url('https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1800&q=80') center/cover fixed}.stButton button{min-height:145px!important;font-size:1.2rem!important;border-radius:24px!important;background:linear-gradient(135deg,#1a1230,#67318b)!important;box-shadow:0 14px 28px rgba(49,22,74,.25)!important}</style>", unsafe_allow_html=True)
     st.markdown("## 选择创作工具")
     st.caption("选择一个工作区，进入完整功能")
     nav1, nav2 = st.columns(2)
@@ -101,6 +104,10 @@ if st.session_state.entered and st.session_state.active_tool is None:
     st.stop()
 
 if st.session_state.entered and st.session_state.active_tool:
+    if st.session_state.active_tool == "bgm":
+        st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(21,16,41,.28),rgba(60,27,75,.14)),url('https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?auto=format&fit=crop&w=1800&q=80') center/cover fixed}</style>", unsafe_allow_html=True)
+    else:
+        st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(37,24,56,.24),rgba(82,50,99,.14)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=80') center/cover fixed}</style>", unsafe_allow_html=True)
     if st.button("← 返回工具选择", key="back-tools"):
         st.session_state.active_tool = None; st.rerun()
     if st.session_state.active_tool == "bgm":
