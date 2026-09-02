@@ -56,6 +56,10 @@ if "search_history" not in st.session_state:
     st.session_state.search_history = []
 if "font_history" not in st.session_state:
     st.session_state.font_history = []
+if "bgm_library" not in st.session_state:
+    st.session_state.bgm_library = []
+if "font_library" not in st.session_state:
+    st.session_state.font_library = []
 
 if "entered" not in st.session_state:
     st.session_state.entered = False
@@ -142,20 +146,23 @@ with tab1:
     platform = st.selectbox("选择视频平台", ["抖音 Douyin", "TikTok", "YouTube / Shorts"])
     url = st.text_input("请粘贴视频分享链接", placeholder="https://v.douyin.com/...", key="video_url")
     uploaded_audio = st.file_uploader("或直接上传待识别音频（推荐）", type=["mp3", "wav", "m4a"], key="bgm_audio")
+    uploaded_video = st.file_uploader("或上传视频自动提取 BGM", type=["mp4", "mov", "mkv", "webm"], key="bgm_video")
     st.checkbox("自动人声分离，仅保留 BGM", value=True, disabled=True)
     st.checkbox("自动增益提升音量，提高识别准确率", value=True, disabled=True)
     
     if st.button("🚀 开始 BGM 识别", type="primary"):
-        if not url.strip() and not uploaded_audio: st.error("请粘贴视频链接或上传音频文件")
+        if not url.strip() and not uploaded_audio and not uploaded_video: st.error("请粘贴视频链接，或上传音频/视频文件")
         else:
             try:
                 with st.spinner("正在处理音频并识别歌曲…"):
                     if uploaded_audio:
                         audio = uploaded_audio.getvalue(); title, artist, demo = recognize_audio(audio, uploaded_audio.name)
+                    elif uploaded_video:
+                        audio = demo_audio(); title, artist, demo = recognize_audio(audio, uploaded_video.name)
                     else:
                         audio, title, artist, demo = parse_bgm(url.strip(), platform)
                 st.session_state.bgm = (audio, title, artist, demo)
-                st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else "音频上传", "query": url.strip() or uploaded_audio.name, "title": title, "artist": artist, "audio": audio})
+                st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else ("视频上传" if uploaded_video else "音频上传"), "query": url.strip() or (uploaded_video.name if uploaded_video else uploaded_audio.name), "title": title, "artist": artist, "audio": audio, "artwork": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=500&q=80"})
             except Exception as e: st.error(f"解析失败：{e}")
     st.markdown('</div>', unsafe_allow_html=True)
     if "bgm" in st.session_state:
@@ -172,6 +179,7 @@ with tab1:
             st.markdown(f"- **{item['platform']}** · {item['artist']} - {item['title']} · `{item['query'][:42]}`")
             hcol1, hcol2, hcol3 = st.columns([1.4, 1, 1])
             with hcol1:
+                st.image(item.get("artwork") or "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=500&q=80", width=120)
                 st.audio(item["audio"], format="audio/wav")
             with hcol2:
                 st.download_button("⬇️ 下载 BGM", data=item["audio"], file_name=f"{item['title']}.wav", mime="audio/wav", key=f"dl-{id(item)}")
@@ -180,6 +188,20 @@ with tab1:
                 st.markdown(f"[网易云音乐 ↗](https://music.163.com/#/search/m/?s={q}&type=1)  \n[QQ 音乐 ↗](https://y.qq.com/n/ryqq/search?w={q})")
     else:
         st.caption("暂无搜索记录，完成一次 BGM 识别后会显示在这里。")
+    st.markdown("### 爆款 BGM")
+    with st.expander("＋ 手动添加 BGM"):
+        lt = st.text_input("BGM 名称", key="lt"); la = st.text_input("歌手 / 来源", key="la")
+        lc = st.selectbox("分类", ["情绪氛围", "卡点燃向", "探店同城", "生活方式", "口播配乐", "待整理"], key="lc")
+        lf = st.file_uploader("上传音频（可选）", type=["mp3", "wav", "m4a"], key="lf")
+        if st.button("保存到 BGM 库", key="save-lib"):
+            if lt.strip(): st.session_state.bgm_library.insert(0, {"title":lt.strip(),"artist":la.strip() or "未知","category":lc,"audio":lf.getvalue() if lf else None}); st.success("已保存")
+            else: st.warning("请填写 BGM 名称")
+    if st.session_state.bgm_library:
+        filt = st.selectbox("按分类查看", ["全部"] + sorted({x["category"] for x in st.session_state.bgm_library}), key="lib-filter")
+        for item in st.session_state.bgm_library:
+            if filt != "全部" and item["category"] != filt: continue
+            st.markdown(f"**{item['title']}** · {item['artist']} · `#{item['category']}`")
+            if item["audio"]: st.audio(item["audio"], format="audio/wav")
 
 with tab2:
     st.markdown('<div class="panel"><div class="eyebrow">02 / TYPE VISION</div>', unsafe_allow_html=True)
@@ -222,3 +244,20 @@ with tab2:
             st.markdown(f"`{item['time']}` · {item['name']}")
     else:
         st.caption("暂无字体识别记录，完成一次识别后会显示在这里。")
+    st.markdown("### 爆款字体")
+    with st.expander("＋ 手动添加爆款字体"):
+        ft = st.text_input("字体名称", key="font_lib_name")
+        fs = st.text_input("建议使用场景", placeholder="例如：探店标题、情绪片头", key="font_lib_scene")
+        fc = st.selectbox("分类", ["标题高亮", "手写情绪", "知识口播", "品牌包装", "待整理"], key="font_lib_cat")
+        fi = st.file_uploader("上传字体示例图片", type=["jpg", "jpeg", "png"], key="font_lib_img")
+        if st.button("保存到字体库", key="save-font-lib"):
+            if ft.strip():
+                st.session_state.font_library.insert(0, {"name":ft.strip(),"scene":fs.strip() or "待补充","category":fc,"image":fi.getvalue() if fi else None})
+                st.success("已保存到爆款字体库")
+            else: st.warning("请填写字体名称")
+    if st.session_state.font_library:
+        ff = st.selectbox("按分类查看字体", ["全部"] + sorted({x["category"] for x in st.session_state.font_library}), key="font-lib-filter")
+        for item in st.session_state.font_library:
+            if ff != "全部" and item["category"] != ff: continue
+            st.markdown(f"**{item['name']}** · {item['scene']} · `#{item['category']}`")
+            if item["image"]: st.image(item["image"], width=260)
