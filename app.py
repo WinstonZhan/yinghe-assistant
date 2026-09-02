@@ -42,11 +42,15 @@ st.markdown("""
 .hint{color:var(--muted);font-size:.88rem}
 button{border-radius:18px!important}
 div.stButton > button{padding:.9rem 1.5rem!important;font-size:1.05rem!important;font-weight:700!important}
+.stButton button[kind="primary"]{background:linear-gradient(135deg,#26153c,#6f2f92)!important;border:1px solid rgba(255,255,255,.65)!important;box-shadow:0 10px 24px rgba(56,24,82,.28)!important}
+.landing + div .stButton button{background:linear-gradient(135deg,#161222,#3d2457)!important;border:1px solid rgba(255,255,255,.78)!important;border-radius:999px!important;padding:1rem 2.2rem!important;box-shadow:0 12px 26px rgba(36,18,58,.3),inset 0 1px 0 rgba(255,255,255,.25)!important;letter-spacing:.01em}
+.stButton button{transition:transform .2s ease,box-shadow .2s ease}.stButton button:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(60,30,80,.2)!important}
+.tool-nav-bgm button{background:linear-gradient(135deg,#102b49,#217b9d)!important}.tool-nav-font button{background:linear-gradient(135deg,#42194f,#a04f99)!important}
 .stTabs [data-baseweb="tab"]{font-size:1.15rem!important;font-weight:700!important;padding:0.7rem 1.2rem!important}
 .stTabs [data-baseweb="tab-list"]{gap:.5rem}
 .landing{min-height:72vh;border-radius:32px;padding:4rem 5vw;display:flex;align-items:flex-end;background:linear-gradient(120deg,rgba(20,15,35,.78),rgba(93,57,111,.36)),url('https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=1800&q=85') center/cover;box-shadow:0 24px 60px rgba(50,25,70,.25);color:#fff}
 .landing{animation:heroDrift 10s ease-in-out infinite alternate;background-size:125% auto}.landing h2{animation:riseIn 1.2s ease both}.landing p{animation:riseIn 1.5s .15s ease both}@keyframes heroDrift{from{background-position:35% 48%;filter:saturate(.9)}to{background-position:68% 54%;filter:saturate(1.25)}}@keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
-.tool-banner{animation:toolPulse 6s ease-in-out infinite alternate;background-size:180% 180%!important}.bgm-banner{background:linear-gradient(120deg,#171326,#5b2d79,#1b3d63)!important}.font-banner{background:linear-gradient(120deg,#29183f,#814b9a,#264e78)!important}@keyframes toolPulse{from{background-position:0% 50%;filter:saturate(.9)}to{background-position:100% 50%;filter:saturate(1.3)}}
+.tool-banner{animation:toolPulse 8s ease-in-out infinite alternate;background-size:140% auto!important;background-position:center!important}.bgm-banner{background-image:linear-gradient(120deg,rgba(18,12,35,.82),rgba(76,37,105,.48)),url('https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1800&q=85')!important}.font-banner{background-image:linear-gradient(120deg,rgba(41,24,63,.86),rgba(125,77,145,.5)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=85')!important}@keyframes toolPulse{from{background-position:38% 48%;filter:saturate(.9)}to{background-position:62% 52%;filter:saturate(1.3)}}
 .landing h2{font-family:'Noto Serif SC',serif;font-size:clamp(2.6rem,6vw,5.8rem);line-height:1.08;margin:.6rem 0 1rem;max-width:900px}.landing p{font-size:1.1rem;max-width:560px;color:rgba(255,255,255,.82);line-height:1.7}.landing .eyebrow{color:#d7ff8a}
 </style>
 """, unsafe_allow_html=True)
@@ -103,6 +107,11 @@ if st.session_state.entered and st.session_state.active_tool:
         st.markdown("<div class='panel tool-banner bgm-banner' style='color:white'><h2>🎵 BGM 识别工作区</h2><p>提取音频 · 分离人声 · 增加音量 · 交叉识别</p></div>", unsafe_allow_html=True)
     else:
         st.markdown("<div class='panel tool-banner font-banner' style='color:white'><h2>字体识别工作区</h2><p>上传截图，找到最接近的字体并管理爆款字体库</p></div>", unsafe_allow_html=True)
+    # 入口页选择哪个工具，就只显示对应的 Tab，避免跨功能干扰。
+    if st.session_state.active_tool == "bgm":
+        st.markdown("<style>.stTabs [data-baseweb='tab-list'] > div:nth-child(2),.stTabs [role='tab']:nth-child(2){display:none!important}</style><script>setTimeout(()=>{const t=document.querySelector('.stTabs [role=tab]');if(t)t.click()},80)</script>", unsafe_allow_html=True)
+    else:
+        st.markdown("<style>.stTabs [data-baseweb='tab-list'] > div:nth-child(1),.stTabs [role='tab']:nth-child(1){display:none!important}</style><script>setTimeout(()=>{const t=document.querySelectorAll('.stTabs [role=tab]')[1];if(t)t.click()},80)</script>", unsafe_allow_html=True)
 
 def demo_audio() -> bytes:
     rate, seconds = 22050, 4
