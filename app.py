@@ -52,6 +52,7 @@ div.stButton > button{padding:.9rem 1.5rem!important;font-size:1.05rem!important
 .landing{min-height:72vh;border-radius:32px;padding:4rem 5vw;display:flex;align-items:flex-end;background:linear-gradient(120deg,rgba(20,15,35,.78),rgba(93,57,111,.36)),url('https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=1800&q=85') center/cover;box-shadow:0 24px 60px rgba(50,25,70,.25);color:#fff}
 .landing{animation:heroDrift 10s ease-in-out infinite alternate;background-size:125% auto}.landing h2{animation:riseIn 1.2s ease both}.landing p{animation:riseIn 1.5s .15s ease both}@keyframes heroDrift{from{background-position:35% 48%;filter:saturate(.9)}to{background-position:68% 54%;filter:saturate(1.25)}}@keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
 .tool-banner{animation:toolPulse 8s ease-in-out infinite alternate;background-size:140% auto!important;background-position:center!important}.bgm-banner{background-image:linear-gradient(120deg,rgba(18,12,35,.82),rgba(76,37,105,.48)),url('https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1800&q=85')!important}.font-banner{background-image:linear-gradient(120deg,rgba(41,24,63,.86),rgba(125,77,145,.5)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=85')!important}@keyframes toolPulse{from{background-position:38% 48%;filter:saturate(.9)}to{background-position:62% 52%;filter:saturate(1.3)}}
+.bgm-progress-banner{color:#fff!important;min-height:194px;display:flex;flex-direction:column;justify-content:center;gap:.55rem}.bgm-progress-banner h2{margin:0;font-size:clamp(1.8rem,3vw,2.45rem);letter-spacing:-.02em}.bgm-progress-banner p{margin:0;color:rgba(255,255,255,.84);font-size:1.02rem}.bgm-progress-meta{display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;font-size:.92rem;font-weight:700;color:rgba(255,255,255,.92)}.bgm-progress-track{height:10px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.24);box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}.bgm-progress-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,#b9f3ff 0%,#8ce6ff 45%,#dbb1ff 100%);box-shadow:0 0 16px rgba(160,229,255,.72);transition:width .3s ease}.bgm-progress-steps{display:flex;justify-content:space-between;color:rgba(255,255,255,.62);font-size:.75rem;margin-top:.25rem}.bgm-progress-steps span.is-current{color:#fff}
 .music-page{background:linear-gradient(120deg,rgba(21,16,41,.32),rgba(60,27,75,.18)),url('https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?auto=format&fit=crop&w=1800&q=80') center/cover fixed!important}.type-page{background:linear-gradient(120deg,rgba(37,24,56,.28),rgba(82,50,99,.18)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=80') center/cover fixed!important}
 .tool-choice button{min-height:145px!important;font-size:1.25rem!important;border-radius:24px!important}
 .landing h2{font-family:'Noto Serif SC',serif;font-size:clamp(2.6rem,6vw,5.8rem);line-height:1.08;margin:.6rem 0 1rem;max-width:900px}.landing p{font-size:1.1rem;max-width:560px;color:rgba(255,255,255,.82);line-height:1.7}.landing .eyebrow{color:#d7ff8a}
@@ -102,6 +103,25 @@ def copy_button(text: str, key: str, label: str):
         st.code(text, language=None)
         st.info("已准备复制内容：请点击代码框右上角复制。")
 
+
+def render_bgm_header(percent: int = 0, step: str = "等待开始") -> str:
+    """Build the BGM workspace banner and its in-banner progress indicator."""
+    percent = max(0, min(100, int(percent)))
+    stages = [(25, "提取音频"), (50, "分离人声"), (75, "增加音量"), (100, "交叉识别")]
+    step_markup = "".join(
+        f"<span class='{'is-current' if percent >= value else ''}'>{label}</span>"
+        for value, label in stages
+    )
+    return (
+        "<div class='panel tool-banner bgm-banner bgm-progress-banner'>"
+        "<h2>🎵 BGM 识别工作区</h2>"
+        "<p>提取音频 · 分离人声 · 增加音量 · 交叉识别</p>"
+        f"<div class='bgm-progress-meta'><span>{step}</span><span>{percent}%</span></div>"
+        f"<div class='bgm-progress-track' role='progressbar' aria-valuemin='0' aria-valuemax='100' aria-valuenow='{percent}'><div class='bgm-progress-fill' style='width:{percent}%'></div></div>"
+        f"<div class='bgm-progress-steps'>{step_markup}</div>"
+        "</div>"
+    )
+
 if st.session_state.entered and st.session_state.active_tool is None:
     st.markdown("<style>.stApp{background:linear-gradient(145deg,#c8c0da 0%,#e8cad7 42%,#fff 100%)}.st-key-enter-bgm button,.st-key-enter-font button{width:100%!important;min-height:72px!important;border-radius:22px!important;padding:1rem 1.5rem!important;box-shadow:0 14px 28px rgba(49,22,74,.2)!important;color:#fff!important}.st-key-enter-bgm button{background:linear-gradient(135deg,#123b5a,#1d8a9b)!important}.st-key-enter-font button{background:linear-gradient(135deg,#47204f,#a05291)!important}.st-key-enter-bgm button p,.st-key-enter-font button p{font-size:25px!important;font-weight:700!important;color:#fff!important}.st-key-back-home-bottom{margin-top:0}.st-key-back-home-bottom button{min-height:34px!important;width:38px!important;border-radius:50%!important;padding:0!important;background:rgba(255,255,255,.78)!important;color:#21152e!important;box-shadow:0 6px 14px rgba(49,22,74,.15)!important}.st-key-back-home-bottom button p{font-size:18px!important}</style>", unsafe_allow_html=True)
     st.markdown("## 选择创作工具")
@@ -109,6 +129,8 @@ if st.session_state.entered and st.session_state.active_tool is None:
     nav1, nav2 = st.columns(2)
     with nav1:
         if st.button("🎵 进入 BGM 识别", width="stretch", type="primary", key="enter-bgm"):
+            st.session_state.bgm_progress = 0
+            st.session_state.bgm_progress_step = "等待开始"
             st.session_state.active_tool = "bgm"; st.rerun()
     with nav2:
         if st.button("字体识别", width="stretch", type="secondary", key="enter-font"):
@@ -125,10 +147,28 @@ if st.session_state.entered and st.session_state.active_tool:
         st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(37,24,56,.24),rgba(82,50,99,.14)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=80') center/cover fixed}</style>", unsafe_allow_html=True)
     if st.button("← 返回工具选择", key="back-tools"):
         st.session_state.active_tool = None; st.rerun()
+    bgm_header_slot = None
     if st.session_state.active_tool == "bgm":
-        st.markdown("<div class='panel tool-banner bgm-banner' style='color:white'><h2>🎵 BGM 识别工作区</h2><p>提取音频 · 分离人声 · 增加音量 · 交叉识别</p></div>", unsafe_allow_html=True)
+        bgm_header_slot = st.empty()
+        bgm_header_slot.markdown(
+            render_bgm_header(
+                st.session_state.get("bgm_progress", 0),
+                st.session_state.get("bgm_progress_step", "等待开始"),
+            ),
+            unsafe_allow_html=True,
+        )
     else:
         st.markdown("<div class='panel tool-banner font-banner' style='color:white'><h2>字体识别工作区</h2><p>上传截图，找到最接近的字体并管理爆款字体库</p></div>", unsafe_allow_html=True)
+
+
+def update_bgm_progress(percent: int, step: str):
+    """Persist and redraw the in-banner BGM pipeline progress."""
+    st.session_state.bgm_progress = max(0, min(100, int(percent)))
+    st.session_state.bgm_progress_step = step
+    if bgm_header_slot is not None:
+        bgm_header_slot.markdown(render_bgm_header(percent, step), unsafe_allow_html=True)
+
+
 def _configured_api():
     """Return the configured recognition endpoint and token.
 
@@ -168,14 +208,30 @@ def extract_audio_bytes(video_bytes: bytes, suffix: str = ".mp4") -> bytes:
         return audio.read_bytes()
 
 
-def download_and_extract(url: str) -> bytes:
+def download_and_extract(url: str, platform: str = "抖音 Douyin") -> bytes:
     """Download one public video and extract its audio track."""
     ytdlp = _require_binary("YTDLP_PATH", "yt-dlp", "yt-dlp")
+    referers = {
+        "抖音 Douyin": "https://www.douyin.com/",
+        "TikTok": "https://www.tiktok.com/",
+        "YouTube / Shorts": "https://www.youtube.com/",
+    }
     with tempfile.TemporaryDirectory() as td:
         output = Path(td) / "video.%(ext)s"
         try:
             subprocess.run(
-                [ytdlp, "--no-playlist", "--format", "bestaudio/best", "-o", str(output), url],
+                [
+                    ytdlp,
+                    "--no-playlist",
+                    "--format", "bestaudio/best",
+                    "--retries", "3",
+                    "--fragment-retries", "3",
+                    "--socket-timeout", "30",
+                    "--max-filesize", "50M",
+                    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+                    "--referer", referers.get(platform, "https://www.google.com/"),
+                    "-o", str(output), url,
+                ],
                 check=True,
                 capture_output=True,
                 timeout=180,
@@ -183,7 +239,12 @@ def download_and_extract(url: str) -> bytes:
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("链接下载超时，建议直接上传音频或视频文件") from exc
         except subprocess.CalledProcessError as exc:
-            raise RuntimeError("平台拒绝下载该链接，请确认链接公开有效，或直接上传文件") from exc
+            error_text = (exc.stderr or b"").decode("utf-8", errors="ignore").lower()
+            if any(word in error_text for word in ("login", "sign in", "cookie", "验证码", "private video")):
+                raise RuntimeError(f"{platform} 要求登录或验证码，云端无法读取；请直接上传视频或音频文件") from exc
+            if "unsupported url" in error_text:
+                raise RuntimeError("暂不支持这个分享链接格式，请复制平台的完整公开链接，或直接上传文件") from exc
+            raise RuntimeError(f"{platform} 暂时拒绝云端下载该链接，请直接上传视频或音频文件") from exc
         sources = [p for p in Path(td).glob("video.*") if p.is_file()]
         if not sources:
             raise RuntimeError("没有从链接中下载到可处理的视频音频")
@@ -241,7 +302,7 @@ def recognize_audio(data: bytes, filename: str):
 def parse_bgm(url: str, platform: str):
     if not re.match(r"^https?://", url, re.I):
         raise ValueError("链接需要以 http:// 或 https:// 开头")
-    data = download_and_extract(url)
+    data = download_and_extract(url, platform)
     title, artist, demo, artwork, song_link = recognize_audio(data, "bgm.wav")
     return data, title, artist, demo, artwork, song_link
 
@@ -342,26 +403,26 @@ with tab1:
         if not url.strip() and not uploaded_audio and not uploaded_video: st.error("请粘贴视频链接，或上传音频/视频文件")
         else:
             try:
-                progress = st.progress(0, text="提取音频…")
+                # The progress indicator lives in the rounded workspace banner
+                # so the current stage remains visible while the form is busy.
+                update_bgm_progress(0, "准备提取音频")
                 with st.spinner("正在处理音频并识别歌曲…"):
-                    progress.progress(20, text="提取音频…")
                     if uploaded_audio:
                         if uploaded_audio.size > 50 * 1024 * 1024:
                             raise ValueError("音频文件不能超过 50MB")
                         suffix = Path(uploaded_audio.name).suffix.lower() or ".mp3"
                         audio = extract_audio_bytes(uploaded_audio.getvalue(), suffix)
-                        title, artist, demo, artwork, song_link = recognize_audio(audio, "bgm.wav")
                     elif uploaded_video:
                         if uploaded_video.size > 200 * 1024 * 1024:
                             raise ValueError("视频文件不能超过 200MB")
                         suffix = Path(uploaded_video.name).suffix.lower() or ".mp4"
                         audio = extract_audio_bytes(uploaded_video.getvalue(), suffix)
-                        title, artist, demo, artwork, song_link = recognize_audio(audio, "bgm.wav")
                     else:
-                        audio, title, artist, demo, artwork, song_link = parse_bgm(url.strip(), platform)
-                    progress.progress(45, text="分离音频…")
-                    progress.progress(65, text="增加音量…")
-                    progress.progress(85, text="交叉识别…")
+                        audio = download_and_extract(url.strip(), platform)
+                    update_bgm_progress(25, "提取音频")
+                    update_bgm_progress(50, "分离人声")
+                    update_bgm_progress(75, "增加音量")
+                    title, artist, demo, artwork, song_link = recognize_audio(audio, "bgm.wav")
                 st.session_state.bgm = {
                     "audio": audio,
                     "title": title,
@@ -369,7 +430,7 @@ with tab1:
                     "artwork": artwork,
                     "song_link": song_link,
                 }
-                progress.progress(100, text="识别完成")
+                update_bgm_progress(100, "交叉识别完成")
                 st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else ("视频上传" if uploaded_video else "音频上传"), "query": url.strip() or (uploaded_video.name if uploaded_video else uploaded_audio.name), "title": title, "artist": artist, "audio": audio, "artwork": artwork, "song_link": song_link})
             except requests.Timeout: st.error("识别服务响应超时，请稍后再试")
             except requests.HTTPError as e: st.error(f"识别服务请求失败：HTTP {e.response.status_code}")
