@@ -1,5 +1,4 @@
-streamlit
-requests
-pillow
-numpy
-yt-dlp
+streamlit==1.63.0
+requests>=2.32,<3
+pillow>=11,<13
+yt-dlp>=2025.1.1
