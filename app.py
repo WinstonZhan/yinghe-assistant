@@ -59,15 +59,7 @@ div.stButton > button{padding:.9rem 1.5rem!important;font-size:1.05rem!important
 
 if "entered" not in st.session_state: st.session_state.entered = False
 if "active_tool" not in st.session_state: st.session_state.active_tool = None
-if st.session_state.entered and st.session_state.active_tool is None:
-    top_left, top_title = st.columns([0.08, 0.92])
-    with top_left:
-        if st.button("←", key="back-home-top", help="返回主页"):
-            st.session_state.entered = False; st.rerun()
-    with top_title:
-        st.markdown('<div class="hero"><div class="eyebrow">YINGHE / CREATOR DESK</div><h1>映禾小助手 — 短视频编导 AI 工作台</h1><p>把繁琐留给工具，把灵感留给创作</p><div class="hint">BGM 识别  专业字体识别</div></div>', unsafe_allow_html=True)
-else:
-    st.markdown('<div class="hero"><div class="eyebrow">YINGHE / CREATOR DESK</div><h1>映禾小助手 — 短视频编导 AI 工作台</h1><p>把繁琐留给工具，把灵感留给创作</p><div class="hint">BGM 识别  专业字体识别</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="hero"><div class="eyebrow">YINGHE / CREATOR DESK</div><h1>映禾小助手 — 短视频编导 AI 工作台</h1><p>把繁琐留给工具，把灵感留给创作</p><div class="hint">BGM 识别  专业字体识别</div></div>', unsafe_allow_html=True)
 
 if "search_history" not in st.session_state:
     st.session_state.search_history = []
@@ -106,11 +98,14 @@ if st.session_state.entered and st.session_state.active_tool is None:
     with nav2:
         if st.button("字体识别", use_container_width=True, type="secondary"):
             st.session_state.active_tool = "font"; st.rerun()
+    st.markdown("<style>div[data-testid='stButton']:last-of-type button{min-height:34px!important;width:38px!important;border-radius:50%!important;padding:0!important;font-size:18px!important}</style>", unsafe_allow_html=True)
+    if st.button("←", key="back-home-bottom", help="返回主页"):
+        st.session_state.entered = False; st.session_state.active_tool = None; st.rerun()
     st.stop()
 
 if st.session_state.entered and st.session_state.active_tool:
     if st.session_state.active_tool == "bgm":
-        st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(21,16,41,.28),rgba(60,27,75,.14)),url('https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?auto=format&fit=crop&w=1800&q=80') center/cover fixed}</style>", unsafe_allow_html=True)
+        st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(21,16,41,.3),rgba(60,27,75,.16)),url('https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1800&q=80') center/cover fixed}</style>", unsafe_allow_html=True)
     else:
         st.markdown("<style>.stApp{background:linear-gradient(120deg,rgba(37,24,56,.24),rgba(82,50,99,.14)),url('https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1800&q=80') center/cover fixed}</style>", unsafe_allow_html=True)
     if st.button("← 返回工具选择", key="back-tools"):
@@ -184,6 +179,56 @@ def font_results(image: Image.Image):
     base = min(96, max(72, int(contrast + 68)))
     return ([{"name":"剪映特显体","score":base,"scene":"同城探店高亮标题"},{"name":"方正粗黑简体","score":base-7,"scene":"口播知识点与信息卡片"},{"name":"汉仪尚魏手书","score":base-14,"scene":"情绪化片头与生活方式内容"}], True)
 
+def render_font_workspace():
+    uploaded = st.file_uploader("上传字体截图", type=["jpg","jpeg","png"], key="font_image")
+    image = None
+    if uploaded:
+        if uploaded.size > 10 * 1024 * 1024: st.error("图片不能超过 10MB")
+        else:
+            try: image = Image.open(uploaded).convert("RGB"); st.image(image, caption="截图预览", width=560)
+            except Exception as e: st.error(f"图片读取失败：{e}")
+    if st.button("🔍 开始识别字体", type="primary", key="font-action"):
+        if image is None: st.error("请先上传有效的 JPG 或 PNG 图片")
+        else:
+            try:
+                prep = ImageEnhance.Contrast(image.convert("L")).enhance(1.35).filter(ImageFilter.SHARPEN)
+                st.session_state.fonts = font_results(prep)
+                top_name = st.session_state.fonts[0][0]["name"]
+                st.session_state.font_history.insert(0, {"name": top_name, "time": __import__('datetime').datetime.now().strftime("%H:%M:%S")})
+            except Exception as e: st.error(f"识别失败：{e}")
+    if "fonts" in st.session_state:
+        results, demo = st.session_state.fonts
+        if demo: st.info("当前为本地演示匹配；配置 FONT_API_URL 与 FONT_API_KEY 后可接入专业字体识别服务。")
+        for i, item in enumerate(results, 1):
+            st.markdown(f'<div class="result"><div class="meta">TOP {i}</div><h3>{item["name"]}</h3><div class="score">匹配度 {item["score"]}%</div><div class="hint">建议场景：{item["scene"]}</div></div>', unsafe_allow_html=True)
+            copy_button(item["name"], f"copy-font-new-{i}", "📋 复制字体名称")
+    st.markdown("### 字体识别历史")
+    st.metric("累计识别次数", len(st.session_state.font_history))
+    if st.session_state.font_history:
+        counts = {}
+        for item in st.session_state.font_history: counts[item["name"]] = counts.get(item["name"], 0) + 1
+        st.caption("搜索最多")
+        for name, count in sorted(counts.items(), key=lambda x: x[1], reverse=True): st.markdown(f"- **{name}** · {count} 次")
+    else: st.caption("暂无字体识别记录，完成一次识别后会显示在这里。")
+    st.markdown("### 爆款字体")
+    with st.expander("＋ 手动添加爆款字体"):
+        ft = st.text_input("字体名称", key="font_lib_name_new"); fs = st.text_input("建议使用场景", key="font_lib_scene_new")
+        fc = st.selectbox("分类", ["标题高亮", "手写情绪", "知识口播", "品牌包装", "待整理"], key="font_lib_cat_new")
+        fi = st.file_uploader("上传字体示例图片", type=["jpg","jpeg","png"], key="font_lib_img_new")
+        if st.button("保存到字体库", key="save-font-lib-new"):
+            if ft.strip(): st.session_state.font_library.insert(0, {"name":ft.strip(),"scene":fs.strip() or "待补充","category":fc,"image":fi.getvalue() if fi else None}); st.success("已保存到爆款字体库")
+            else: st.warning("请填写字体名称")
+    if st.session_state.font_library:
+        ff = st.selectbox("按分类查看字体", ["全部"] + sorted({x["category"] for x in st.session_state.font_library}), key="font-lib-filter-new")
+        for item in st.session_state.font_library:
+            if ff != "全部" and item["category"] != ff: continue
+            st.markdown(f"**{item['name']}** · {item['scene']} · `#{item['category']}`")
+            if item["image"]: st.image(item["image"], width=260)
+
+if st.session_state.entered and st.session_state.active_tool == "font":
+    render_font_workspace()
+    st.stop()
+
 tab1, tab2 = st.tabs(["🎵 BGM 识别", "字体识别"])
 with tab1:
     st.markdown('<div class="panel"><div class="eyebrow">01 / AUDIO</div>', unsafe_allow_html=True)
@@ -238,6 +283,7 @@ with tab1:
                 st.markdown(f"[网易云音乐 ↗](https://music.163.com/#/search/m/?s={q}&type=1)  \n[QQ 音乐 ↗](https://y.qq.com/n/ryqq/search?w={q})")
     else:
         st.caption("暂无搜索记录，完成一次 BGM 识别后会显示在这里。")
+    if st.session_state.active_tool == "bgm": st.stop()
     st.markdown("### 爆款 BGM")
     with st.expander("＋ 手动添加 BGM"):
         search_word = st.text_input("先搜索音乐（可选）", placeholder="输入歌名或歌手", key="lib_search")
