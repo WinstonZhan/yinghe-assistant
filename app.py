@@ -251,6 +251,90 @@ def download_and_extract(url: str, platform: str = "抖音 Douyin") -> bytes:
         return extract_audio_bytes(sources[0].read_bytes(), sources[0].suffix)
 
 
+def _find_media_url(payload):
+    """Find a media URL in common resolver response shapes."""
+    preferred_keys = {
+        "media_url", "video_url", "audio_url", "download_url", "download", "play",
+        "play_url", "play_addr", "no_watermark_url", "url",
+    }
+    if isinstance(payload, dict):
+        for key in preferred_keys:
+            value = payload.get(key)
+            if isinstance(value, str) and re.match(r"^https?://", value, re.I):
+                return value
+        for value in payload.values():
+            found = _find_media_url(value)
+            if found:
+                return found
+    elif isinstance(payload, list):
+        for value in payload:
+            found = _find_media_url(value)
+            if found:
+                return found
+    return ""
+
+
+def _download_resolved_media(media_url: str) -> bytes:
+    """Download a resolver-provided media URL with a conservative size cap."""
+    if not re.match(r"^https://", media_url, re.I):
+        raise RuntimeError("解析服务返回的媒体地址不是安全的 HTTPS 链接")
+    try:
+        response = requests.get(media_url, timeout=120, stream=True)
+        response.raise_for_status()
+        max_bytes = 220 * 1024 * 1024
+        content_length = response.headers.get("content-length")
+        if content_length and int(content_length) > max_bytes:
+            raise ValueError("解析后的视频超过 220MB，请换一条较短的视频")
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(1024 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError("解析后的视频超过 220MB，请换一条较短的视频")
+            chunks.append(chunk)
+        return b"".join(chunks)
+    except requests.Timeout as exc:
+        raise RuntimeError("解析服务返回媒体超时，请稍后重试") from exc
+
+
+def resolve_and_extract(url: str, platform: str) -> bytes:
+    """Resolve a sharing-page URL through a configured cloud media provider."""
+    resolver_api = config_value("MEDIA_RESOLVER_API_URL")
+    if not resolver_api:
+        raise RuntimeError(
+            "还没有配置云端链接解析服务。请在 Streamlit Cloud Secrets 中填写 MEDIA_RESOLVER_API_URL 和 MEDIA_RESOLVER_API_KEY"
+        )
+    if not re.match(r"^https://", resolver_api, re.I):
+        raise RuntimeError("MEDIA_RESOLVER_API_URL 必须使用 HTTPS")
+    resolver_key = config_value("MEDIA_RESOLVER_API_KEY")
+    headers = {"Accept": "application/json"}
+    if resolver_key:
+        headers["Authorization"] = f"Bearer {resolver_key}"
+        headers["X-API-Key"] = resolver_key
+    try:
+        response = requests.post(
+            resolver_api,
+            json={"url": url, "platform": platform},
+            headers=headers,
+            timeout=60,
+        )
+        response.raise_for_status()
+        media_url = _find_media_url(response.json())
+    except requests.Timeout as exc:
+        raise RuntimeError("云端链接解析服务响应超时，请稍后重试") from exc
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "未知"
+        raise RuntimeError(f"云端链接解析服务请求失败：HTTP {status}") from exc
+    except ValueError as exc:
+        raise RuntimeError("云端链接解析服务返回的数据格式无法识别") from exc
+    if not media_url:
+        raise RuntimeError("云端链接解析服务没有返回可下载的音视频地址")
+    suffix = Path(media_url.split("?", 1)[0]).suffix.lower() or ".mp4"
+    return extract_audio_bytes(_download_resolved_media(media_url), suffix)
+
+
 def _recognition_result(payload: dict):
     if payload.get("status") == "error":
         error = payload.get("error") or {}
@@ -398,6 +482,10 @@ with tab1:
     uploaded_audio = st.file_uploader("或直接上传待识别音频（推荐）", type=["mp3", "wav", "m4a"], key="bgm_audio")
     uploaded_video = st.file_uploader("或上传视频自动提取 BGM", type=["mp4", "mov", "mkv", "webm"], key="bgm_video")
     st.caption("上传视频或粘贴公开链接后，系统会自动提取并标准化音量，再提交 AudD 识别。")
+    if config_value("MEDIA_RESOLVER_API_URL"):
+        st.caption("已启用云端链接解析：粘贴抖音分享页后，会先解析媒体地址再处理。")
+    else:
+        st.caption("提示：抖音分享页需要配置云端链接解析服务；未配置时请直接上传视频或音频。")
     
     if st.button("🚀 开始 BGM 识别", type="primary"):
         if not url.strip() and not uploaded_audio and not uploaded_video: st.error("请粘贴视频链接，或上传音频/视频文件")
@@ -418,7 +506,10 @@ with tab1:
                         suffix = Path(uploaded_video.name).suffix.lower() or ".mp4"
                         audio = extract_audio_bytes(uploaded_video.getvalue(), suffix)
                     else:
-                        audio = download_and_extract(url.strip(), platform)
+                        if config_value("MEDIA_RESOLVER_API_URL"):
+                            audio = resolve_and_extract(url.strip(), platform)
+                        else:
+                            audio = download_and_extract(url.strip(), platform)
                     update_bgm_progress(25, "提取音频")
                     update_bgm_progress(50, "分离人声")
                     update_bgm_progress(75, "增加音量")
