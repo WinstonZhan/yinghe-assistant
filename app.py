@@ -470,7 +470,9 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "未知"
         detail = _resolver_error_detail(exc.response) if exc.response is not None else ""
-        if not detail and rapidapi_get and status == 403:
+        if rapidapi_get and status == 429:
+            detail = "RapidAPI 返回请求过多，可能是当前套餐的调用频率或月度额度已达到上限；请稍后再试并检查套餐额度"
+        elif not detail and rapidapi_get and status == 403:
             detail = "RapidAPI 拒绝当前应用访问，请确认订阅与 X-RapidAPI-Key 属于同一个 App"
         suffix = f"；{detail}" if detail else ""
         raise RuntimeError(f"云端链接解析服务请求失败：HTTP {status}{suffix}") from exc
