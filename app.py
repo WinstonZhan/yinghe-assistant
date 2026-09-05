@@ -493,6 +493,8 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
         detail = _resolver_error_detail(exc.response) if exc.response is not None else ""
         if rapidapi_get and status == 429:
             detail = "RapidAPI 返回请求过多，可能是当前套餐的调用频率或月度额度已达到上限；请稍后再试并检查套餐额度"
+        elif rapidapi_get and status == 400:
+            detail = "RapidAPI 要求 share_url 是可公开访问的抖音分享链接；请重新复制一条最新链接后再试（不要复制私密视频或已删除视频）"
         elif not detail and rapidapi_get and status == 403:
             detail = "RapidAPI 拒绝当前应用访问，请确认订阅与 X-RapidAPI-Key 属于同一个 App"
         suffix = f"；{detail}" if detail else ""
@@ -670,6 +672,12 @@ with tab1:
     uploaded_audio = st.file_uploader("或直接上传待识别音频（推荐）", type=["mp3", "wav", "m4a"], key="bgm_audio")
     uploaded_video = st.file_uploader("或上传视频自动提取 BGM", type=["mp4", "mov", "mkv", "webm"], key="bgm_video")
     st.caption("上传视频或粘贴公开链接后，系统会自动提取并标准化音量，再提交 AudD 识别。可直接粘贴抖音分享文案，系统会自动提取其中的链接。")
+    if url.strip():
+        cleaned_url = extract_share_url(url)
+        if cleaned_url:
+            st.caption(f"将使用链接：{cleaned_url}")
+        else:
+            st.warning("没有检测到有效的 HTTP/HTTPS 链接，请重新复制抖音分享链接。")
     if config_value("MEDIA_RESOLVER_API_URL"):
         st.caption("已启用云端链接解析：粘贴抖音分享页后，会先解析媒体地址再处理。")
     else:
