@@ -251,49 +251,111 @@ def download_and_extract(url: str, platform: str = "抖音 Douyin") -> bytes:
         return extract_audio_bytes(sources[0].read_bytes(), sources[0].suffix)
 
 
-def _find_media_url(payload):
-    """Find a media URL in common resolver response shapes."""
-    preferred_keys = (
-        "media_url", "video_url", "audio_url", "download_url", "download", "play",
-        "play_url", "play_addr", "no_watermark_url", "url_list",
+def _find_media_urls(payload):
+    """Return likely playable URLs before artwork and profile image URLs."""
+    candidates = []
+    seen = set()
+    direct_keys = (
+        "media_url", "video_url", "audio_url", "download_url",
+        "no_watermark_url", "wmplay", "nwm_video_url",
     )
-    if isinstance(payload, dict):
-        for key in preferred_keys:
-            value = payload.get(key)
-            if isinstance(value, str) and re.match(r"^https?://", value, re.I):
-                return value
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, str) and re.match(r"^https?://", item, re.I):
-                        return item
-                    found = _find_media_url(item)
-                    if found:
-                        return found
-            if isinstance(value, dict):
-                found = _find_media_url(value)
-                if found:
-                    return found
-        for value in payload.values():
-            found = _find_media_url(value)
-            if found:
-                return found
-        value = payload.get("url")
+    media_containers = (
+        "video", "video_data", "aweme_detail", "aweme_details", "aweme_list",
+        "item", "item_list", "items", "data", "result", "music",
+    )
+    playback_keys = (
+        "play_addr_h264", "play_addr", "download_addr", "download",
+        "play_url", "play", "url_list",
+    )
+    ignored_fragments = (
+        "avatar", "cover", "image", "thumbnail", "logo", "author",
+        "share_info", "comment", "statistics",
+    )
+
+    def add_url(value):
         if isinstance(value, str) and re.match(r"^https?://", value, re.I):
-            return value
-    elif isinstance(payload, list):
-        for value in payload:
-            found = _find_media_url(value)
-            if found:
-                return found
-    return ""
+            if value not in seen:
+                seen.add(value)
+                candidates.append(value)
+
+    def visit(value):
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    add_url(item)
+                else:
+                    visit(item)
+            return
+        if not isinstance(value, dict):
+            return
+
+        processed = set()
+        for key in direct_keys:
+            if key in value:
+                processed.add(key)
+                child = value[key]
+                if isinstance(child, str):
+                    add_url(child)
+                else:
+                    visit(child)
+        for key in media_containers:
+            if key in value:
+                processed.add(key)
+                visit(value[key])
+        for key in playback_keys:
+            if key in value:
+                processed.add(key)
+                child = value[key]
+                if isinstance(child, str):
+                    add_url(child)
+                else:
+                    visit(child)
+        if "url" in value:
+            processed.add("url")
+            add_url(value["url"])
+
+        for key, child in value.items():
+            if key in processed:
+                continue
+            lowered = str(key).lower()
+            if any(fragment in lowered for fragment in ignored_fragments):
+                continue
+            visit(child)
+
+    visit(payload)
+    return candidates
 
 
-def _download_resolved_media(media_url: str) -> bytes:
+def _find_media_url(payload):
+    """Keep the original single-URL helper contract for other callers."""
+    candidates = _find_media_urls(payload)
+    return candidates[0] if candidates else ""
+
+
+def _download_resolved_media(media_url: str, platform: str = "") -> bytes:
     """Download a resolver-provided media URL with a conservative size cap."""
     if not re.match(r"^https://", media_url, re.I):
         raise RuntimeError("解析服务返回的媒体地址不是安全的 HTTPS 链接")
+    platform_name = platform.lower()
+    referer = "https://www.tiktok.com/" if "tiktok" in platform_name else "https://www.douyin.com/"
+    headers = {
+        "Accept": "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Referer": referer,
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+    }
     try:
-        response = requests.get(media_url, timeout=120, stream=True)
+        response = requests.get(
+            media_url,
+            headers=headers,
+            timeout=120,
+            stream=True,
+            allow_redirects=True,
+        )
         response.raise_for_status()
         max_bytes = 220 * 1024 * 1024
         content_length = response.headers.get("content-length")
@@ -368,7 +430,7 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
                 timeout=60,
             )
         response.raise_for_status()
-        media_url = _find_media_url(response.json())
+        media_urls = _find_media_urls(response.json())
     except requests.Timeout as exc:
         raise RuntimeError("云端链接解析服务响应超时，请稍后重试") from exc
     except requests.HTTPError as exc:
@@ -376,10 +438,28 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
         raise RuntimeError(f"云端链接解析服务请求失败：HTTP {status}") from exc
     except ValueError as exc:
         raise RuntimeError("云端链接解析服务返回的数据格式无法识别") from exc
-    if not media_url:
+    if not media_urls:
         raise RuntimeError("云端链接解析服务没有返回可下载的音视频地址")
-    suffix = Path(media_url.split("?", 1)[0]).suffix.lower() or ".mp4"
-    return extract_audio_bytes(_download_resolved_media(media_url), suffix)
+    download_errors = []
+    for media_url in media_urls[:8]:
+        suffix = Path(media_url.split("?", 1)[0]).suffix.lower() or ".mp4"
+        try:
+            media = _download_resolved_media(media_url, platform)
+            return extract_audio_bytes(media, suffix)
+        except (requests.HTTPError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
+            download_errors.append(exc)
+    forbidden = any(
+        isinstance(exc, requests.HTTPError)
+        and exc.response is not None
+        and exc.response.status_code == 403
+        for exc in download_errors
+    )
+    if forbidden:
+        raise RuntimeError(
+            "分享链接已解析，但抖音媒体地址拒绝云端下载（HTTP 403）；"
+            "请换一个公开作品，或直接上传视频/音频文件"
+        )
+    raise RuntimeError("分享链接已解析，但返回的媒体地址均无法处理；请换一个公开作品")
 
 
 def _recognition_result(payload: dict):
