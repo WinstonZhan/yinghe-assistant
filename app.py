@@ -375,6 +375,30 @@ def _download_resolved_media(media_url: str, platform: str = "") -> bytes:
         raise RuntimeError("解析服务返回媒体超时，请稍后重试") from exc
 
 
+def _resolver_error_detail(response) -> str:
+    """Extract a short provider message without echoing request headers or keys."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    values = [
+        payload.get("message_zh"),
+        payload.get("message"),
+        payload.get("error_description"),
+        payload.get("error"),
+        payload.get("detail"),
+    ]
+    detail = payload.get("detail")
+    if isinstance(detail, dict):
+        values = [detail.get("message_zh"), detail.get("message"), detail.get("error")] + values
+    for value in values:
+        if isinstance(value, str) and value.strip():
+            return re.sub(r"\s+", " ", value).strip()[:240]
+    return ""
+
+
 def resolve_and_extract(url: str, platform: str) -> bytes:
     """Resolve a sharing-page URL through a configured cloud media provider.
 
@@ -382,25 +406,35 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
     ``MEDIA_RESOLVER_MODE=rapidapi_get`` for RapidAPI or ``tikhub_get`` for
     TikHub's Bearer-token GET endpoint.
     """
-    resolver_api = config_value("MEDIA_RESOLVER_API_URL")
+    resolver_api = config_value("MEDIA_RESOLVER_API_URL").strip()
     if not resolver_api:
         raise RuntimeError(
             "还没有配置云端链接解析服务。请在 Streamlit Cloud Secrets 中填写 MEDIA_RESOLVER_API_URL 和 MEDIA_RESOLVER_API_KEY"
         )
     if not re.match(r"^https://", resolver_api, re.I):
         raise RuntimeError("MEDIA_RESOLVER_API_URL 必须使用 HTTPS")
-    resolver_key = config_value("MEDIA_RESOLVER_API_KEY")
+    resolver_key = config_value("MEDIA_RESOLVER_API_KEY").strip()
     resolver_mode = config_value("MEDIA_RESOLVER_MODE", "post_json").strip().lower()
     url_param = config_value("MEDIA_RESOLVER_URL_PARAM", "url").strip() or "url"
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+    }
     rapidapi_get = resolver_mode in {"rapidapi", "rapidapi_get"}
     bearer_get = resolver_mode in {"tikhub", "tikhub_get", "bearer_get", "get"}
     if rapidapi_get:
-        if resolver_key:
-            headers["X-RapidAPI-Key"] = resolver_key
-        resolver_host = config_value("MEDIA_RESOLVER_API_HOST")
-        if resolver_host:
-            headers["X-RapidAPI-Host"] = resolver_host
+        if not resolver_key:
+            raise RuntimeError("Streamlit Secrets 中缺少 MEDIA_RESOLVER_API_KEY")
+        resolver_host = config_value("MEDIA_RESOLVER_API_HOST").strip()
+        if not resolver_host:
+            raise RuntimeError("Streamlit Secrets 中缺少 MEDIA_RESOLVER_API_HOST")
+        headers["Content-Type"] = "application/json"
+        headers["X-RapidAPI-Key"] = resolver_key
+        headers["X-RapidAPI-Host"] = resolver_host
     elif bearer_get:
         if resolver_key:
             headers["Authorization"] = f"Bearer {resolver_key}"
@@ -435,7 +469,11 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
         raise RuntimeError("云端链接解析服务响应超时，请稍后重试") from exc
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "未知"
-        raise RuntimeError(f"云端链接解析服务请求失败：HTTP {status}") from exc
+        detail = _resolver_error_detail(exc.response) if exc.response is not None else ""
+        if not detail and rapidapi_get and status == 403:
+            detail = "RapidAPI 拒绝当前应用访问，请确认订阅与 X-RapidAPI-Key 属于同一个 App"
+        suffix = f"；{detail}" if detail else ""
+        raise RuntimeError(f"云端链接解析服务请求失败：HTTP {status}{suffix}") from exc
     except ValueError as exc:
         raise RuntimeError("云端链接解析服务返回的数据格式无法识别") from exc
     if not media_urls:
