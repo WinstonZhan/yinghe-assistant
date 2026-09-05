@@ -253,19 +253,33 @@ def download_and_extract(url: str, platform: str = "抖音 Douyin") -> bytes:
 
 def _find_media_url(payload):
     """Find a media URL in common resolver response shapes."""
-    preferred_keys = {
+    preferred_keys = (
         "media_url", "video_url", "audio_url", "download_url", "download", "play",
-        "play_url", "play_addr", "no_watermark_url", "url",
-    }
+        "play_url", "play_addr", "no_watermark_url", "url_list",
+    )
     if isinstance(payload, dict):
         for key in preferred_keys:
             value = payload.get(key)
             if isinstance(value, str) and re.match(r"^https?://", value, re.I):
                 return value
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and re.match(r"^https?://", item, re.I):
+                        return item
+                    found = _find_media_url(item)
+                    if found:
+                        return found
+            if isinstance(value, dict):
+                found = _find_media_url(value)
+                if found:
+                    return found
         for value in payload.values():
             found = _find_media_url(value)
             if found:
                 return found
+        value = payload.get("url")
+        if isinstance(value, str) and re.match(r"^https?://", value, re.I):
+            return value
     elif isinstance(payload, list):
         for value in payload:
             found = _find_media_url(value)
@@ -300,7 +314,12 @@ def _download_resolved_media(media_url: str) -> bytes:
 
 
 def resolve_and_extract(url: str, platform: str) -> bytes:
-    """Resolve a sharing-page URL through a configured cloud media provider."""
+    """Resolve a sharing-page URL through a configured cloud media provider.
+
+    ``post_json`` is the default contract used by a custom resolver. Set
+    ``MEDIA_RESOLVER_MODE=rapidapi_get`` for RapidAPI or ``tikhub_get`` for
+    TikHub's Bearer-token GET endpoint.
+    """
     resolver_api = config_value("MEDIA_RESOLVER_API_URL")
     if not resolver_api:
         raise RuntimeError(
@@ -309,17 +328,45 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
     if not re.match(r"^https://", resolver_api, re.I):
         raise RuntimeError("MEDIA_RESOLVER_API_URL 必须使用 HTTPS")
     resolver_key = config_value("MEDIA_RESOLVER_API_KEY")
+    resolver_mode = config_value("MEDIA_RESOLVER_MODE", "post_json").strip().lower()
+    url_param = config_value("MEDIA_RESOLVER_URL_PARAM", "url").strip() or "url"
     headers = {"Accept": "application/json"}
-    if resolver_key:
+    rapidapi_get = resolver_mode in {"rapidapi", "rapidapi_get"}
+    bearer_get = resolver_mode in {"tikhub", "tikhub_get", "bearer_get", "get"}
+    if rapidapi_get:
+        if resolver_key:
+            headers["X-RapidAPI-Key"] = resolver_key
+        resolver_host = config_value("MEDIA_RESOLVER_API_HOST")
+        if resolver_host:
+            headers["X-RapidAPI-Host"] = resolver_host
+    elif bearer_get:
+        if resolver_key:
+            headers["Authorization"] = f"Bearer {resolver_key}"
+    elif resolver_key:
         headers["Authorization"] = f"Bearer {resolver_key}"
         headers["X-API-Key"] = resolver_key
     try:
-        response = requests.post(
-            resolver_api,
-            json={"url": url, "platform": platform},
-            headers=headers,
-            timeout=60,
-        )
+        if rapidapi_get or bearer_get:
+            response = requests.get(
+                resolver_api,
+                params={url_param: url},
+                headers=headers,
+                timeout=60,
+            )
+        elif resolver_mode in {"post_form", "form"}:
+            response = requests.post(
+                resolver_api,
+                data={url_param: url, "platform": platform},
+                headers=headers,
+                timeout=60,
+            )
+        else:
+            response = requests.post(
+                resolver_api,
+                json={"url": url, "platform": platform},
+                headers=headers,
+                timeout=60,
+            )
         response.raise_for_status()
         media_url = _find_media_url(response.json())
     except requests.Timeout as exc:
