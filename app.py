@@ -399,6 +399,23 @@ def _resolver_error_detail(response) -> str:
     return ""
 
 
+def extract_share_url(raw: str) -> str:
+    """Extract the first HTTP(S) URL from a copied sharing message.
+
+    Douyin's share sheet often copies explanatory text together with the link
+    (for example, ``"复制此链接，打开抖音... https://v.douyin.com/..."``).
+    Resolver endpoints expect only the URL, so strip surrounding whitespace and
+    common punctuation before sending it.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    match = re.search(r"https?://[^\s<>\"']+", text, flags=re.IGNORECASE)
+    if not match:
+        return ""
+    return match.group(0).rstrip(".,!?;:，。！？；：、）】》\"'”’")
+
+
 def resolve_and_extract(url: str, platform: str) -> bytes:
     """Resolve a sharing-page URL through a configured cloud media provider.
 
@@ -406,6 +423,9 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
     ``MEDIA_RESOLVER_MODE=rapidapi_get`` for RapidAPI or ``tikhub_get`` for
     TikHub's Bearer-token GET endpoint.
     """
+    share_url = extract_share_url(url)
+    if not share_url:
+        raise RuntimeError("未找到有效的 HTTP/HTTPS 分享链接，请只粘贴抖音分享链接或完整分享文案")
     resolver_api = config_value("MEDIA_RESOLVER_API_URL").strip()
     if not resolver_api:
         raise RuntimeError(
@@ -415,7 +435,9 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
         raise RuntimeError("MEDIA_RESOLVER_API_URL 必须使用 HTTPS")
     resolver_key = config_value("MEDIA_RESOLVER_API_KEY").strip()
     resolver_mode = config_value("MEDIA_RESOLVER_MODE", "post_json").strip().lower()
-    url_param = config_value("MEDIA_RESOLVER_URL_PARAM", "url").strip() or "url"
+    rapidapi_get = resolver_mode in {"rapidapi", "rapidapi_get"}
+    default_url_param = "share_url" if rapidapi_get else "url"
+    url_param = config_value("MEDIA_RESOLVER_URL_PARAM", default_url_param).strip() or default_url_param
     headers = {
         "Accept": "application/json",
         "User-Agent": (
@@ -424,7 +446,6 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
             "Chrome/131.0.0.0 Safari/537.36"
         ),
     }
-    rapidapi_get = resolver_mode in {"rapidapi", "rapidapi_get"}
     bearer_get = resolver_mode in {"tikhub", "tikhub_get", "bearer_get", "get"}
     if rapidapi_get:
         if not resolver_key:
@@ -445,21 +466,21 @@ def resolve_and_extract(url: str, platform: str) -> bytes:
         if rapidapi_get or bearer_get:
             response = requests.get(
                 resolver_api,
-                params={url_param: url},
+                params={url_param: share_url},
                 headers=headers,
                 timeout=60,
             )
         elif resolver_mode in {"post_form", "form"}:
             response = requests.post(
                 resolver_api,
-                data={url_param: url, "platform": platform},
+                data={url_param: share_url, "platform": platform},
                 headers=headers,
                 timeout=60,
             )
         else:
             response = requests.post(
                 resolver_api,
-                json={"url": url, "platform": platform},
+                json={"url": share_url, "platform": platform},
                 headers=headers,
                 timeout=60,
             )
@@ -648,7 +669,7 @@ with tab1:
     url = st.text_input("请粘贴视频分享链接", placeholder="https://v.douyin.com/...", key="video_url")
     uploaded_audio = st.file_uploader("或直接上传待识别音频（推荐）", type=["mp3", "wav", "m4a"], key="bgm_audio")
     uploaded_video = st.file_uploader("或上传视频自动提取 BGM", type=["mp4", "mov", "mkv", "webm"], key="bgm_video")
-    st.caption("上传视频或粘贴公开链接后，系统会自动提取并标准化音量，再提交 AudD 识别。")
+    st.caption("上传视频或粘贴公开链接后，系统会自动提取并标准化音量，再提交 AudD 识别。可直接粘贴抖音分享文案，系统会自动提取其中的链接。")
     if config_value("MEDIA_RESOLVER_API_URL"):
         st.caption("已启用云端链接解析：粘贴抖音分享页后，会先解析媒体地址再处理。")
     else:
@@ -680,7 +701,7 @@ with tab1:
                     update_bgm_progress(25, "提取音频")
                     update_bgm_progress(50, "分离人声")
                     update_bgm_progress(75, "增加音量")
-                    title, artist, demo, artwork, song_link = recognize_audio(audio, "bgm.wav")
+                title, artist, demo, artwork, song_link = recognize_audio(audio, "bgm.wav")
                 st.session_state.bgm = {
                     "audio": audio,
                     "title": title,
@@ -689,7 +710,8 @@ with tab1:
                     "song_link": song_link,
                 }
                 update_bgm_progress(100, "交叉识别完成")
-                st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else ("视频上传" if uploaded_video else "音频上传"), "query": url.strip() or (uploaded_video.name if uploaded_video else uploaded_audio.name), "title": title, "artist": artist, "audio": audio, "artwork": artwork, "song_link": song_link})
+                query_text = extract_share_url(url) or url.strip()
+                st.session_state.search_history.insert(0, {"platform": platform.split()[0] if url.strip() else ("视频上传" if uploaded_video else "音频上传"), "query": query_text or (uploaded_video.name if uploaded_video else uploaded_audio.name), "title": title, "artist": artist, "audio": audio, "artwork": artwork, "song_link": song_link})
             except requests.Timeout: st.error("识别服务响应超时，请稍后再试")
             except requests.HTTPError as e: st.error(f"识别服务请求失败：HTTP {e.response.status_code}")
             except Exception as e: st.error(f"识别失败：{e}")
